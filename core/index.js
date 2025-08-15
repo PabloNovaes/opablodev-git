@@ -39,30 +39,24 @@ async function createBranch() {
 }
 
 async function createPR() {
-    // Pega a branch atual
     const currentBranch = execSync('git branch --show-current', { encoding: 'utf-8' }).trim();
 
-    // Pega todas as branches para escolher a base
     const branches = execSync('git branch --format="%(refname:short)"', { encoding: 'utf-8' })
         .split('\n').map(b => b.trim()).filter(Boolean);
 
-    // Pergunta para qual branch o PR vai
     const { baseBranch } = await inquirer.prompt([
         { type: 'list', name: 'baseBranch', message: 'Select the base branch for the PR:', choices: branches.filter(b => b !== currentBranch) }
     ]);
 
-    // Pergunta título e descrição
     const { title, body } = await inquirer.prompt([
         { type: 'input', name: 'title', message: 'Enter PR title:' },
         { type: 'input', name: 'body', message: 'Enter PR description:' }
     ]);
 
-    // Cria o PR com o usuário corrente como assignee
     let prNumber;
     try {
         const output = execSync(`gh pr create --base "${baseBranch}" --head "${currentBranch}" --title "${title}" --body "${body}" --assignee @me`, { encoding: 'utf-8' });
         console.log(output);
-        const match = output.match(/#(\d+)/); // captura número do PR
         prNumber = match ? match[1] : null;
         console.log(`✅ Pull request #${prNumber} created from "${currentBranch}" to "${baseBranch}"`);
     } catch (err) {
@@ -70,12 +64,10 @@ async function createPR() {
         return;
     }
 
-    // ------------------ Seleção de reviewers ------------------
     if (prNumber) {
         let reviewers = [];
         try {
             const raw = execSync('gh api repos/:owner/:repo/collaborators --jq ".[].login"', { encoding: 'utf-8' });
-            reviewers = raw.split('\n').filter(Boolean).filter(u => u !== process.env.GITHUB_USER); // remove você mesmo
         } catch {
             console.warn('⚠ Could not fetch reviewers automatically.');
         }
@@ -101,12 +93,10 @@ async function up() {
     let isInitialCommit = false;
     let remoteConfigured = false;
 
-    // ------------------ Initialize repository ------------------
     if (!repoInitialized) {
         console.log('🔹 Git repository not found. Initializing...');
         execSync('git init', { stdio: 'inherit' });
 
-        // Create default .gitignore if it doesn't exist
         if (!fs.existsSync('.gitignore')) {
             const defaultGitignore = `
 node_modules/
@@ -120,14 +110,12 @@ coverage/
             console.log('✅ .gitignore created');
         }
 
-        // Initial commit
         console.log('🔹 Creating initial commit...');
         execSync('git add .', { stdio: 'inherit' });
         execSync('git commit -m "chore: initial commit"', { stdio: 'inherit' });
         isInitialCommit = true;
     }
 
-    // ------------------ Check existing remote ------------------
     try {
         const existingRemote = execSync('git config --get remote.origin.url', { encoding: 'utf-8' }).trim();
         if (existingRemote) {
@@ -138,7 +126,6 @@ coverage/
         remoteConfigured = false;
     }
 
-    // ------------------ Remote handling ------------------
     if (!remoteConfigured) {
         const { hasRemote } = await inquirer.prompt([
             { type: 'confirm', name: 'hasRemote', message: 'Do you already have a remote repository?', default: false }
@@ -178,7 +165,6 @@ coverage/
         }
     }
 
-    // ------------------ Add, Commit ------------------
     console.log('🔹 Adding all files...');
     execSync('git add .', { stdio: 'inherit' });
 
@@ -197,7 +183,6 @@ coverage/
         console.log('🔹 Skipping commit prompts for initial commit.');
     }
 
-    // ------------------ Push if remote exists ------------------
     if (remoteConfigured) {
         console.log('🔹 Pushing to remote...');
         try {

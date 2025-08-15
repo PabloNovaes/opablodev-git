@@ -1,4 +1,4 @@
-# @Git CLI
+# Git Workflow
 
 Interactive Git CLI extension for branch management, repository setup, and Pull Requests.
 
