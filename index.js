@@ -38,6 +38,34 @@ async function createBranch() {
     console.log(`✅ Branch "${newBranch}" created and checked out`);
 }
 
+async function createPR() {
+    // Pega a branch atual
+    const currentBranch = execSync('git branch --show-current', { encoding: 'utf-8' }).trim();
+
+    // Pega todas as branches para escolher a base
+    const branches = execSync('git branch --format="%(refname:short)"', { encoding: 'utf-8' })
+        .split('\n').map(b => b.trim()).filter(Boolean);
+
+    // Pergunta para qual branch o PR vai
+    const { baseBranch } = await inquirer.prompt([
+        { type: 'list', name: 'baseBranch', message: 'Select the base branch for the PR:', choices: branches.filter(b => b !== currentBranch) }
+    ]);
+
+    // Pergunta título e descrição
+    const { title, body } = await inquirer.prompt([
+        { type: 'input', name: 'title', message: 'Enter PR title:' },
+        { type: 'input', name: 'body', message: 'Enter PR description:' }
+    ]);
+
+    // Cria o PR
+    try {
+        execSync(`gh pr create --base "${baseBranch}" --head "${currentBranch}" --title "${title}" --body "${body}"`, { stdio: 'inherit' });
+        console.log(`✅ Pull request created from "${currentBranch}" to "${baseBranch}"`);
+    } catch (err) {
+        console.error('⚠ Failed to create PR. Make sure gh CLI is installed and authenticated.');
+    }
+}
+
 async function up() {
     const repoInitialized = validateRepo();
     let isInitialCommit = false;
@@ -77,7 +105,6 @@ coverage/
             remoteConfigured = true;
         }
     } catch {
-        // No remote configured
         remoteConfigured = false;
     }
 
@@ -99,7 +126,6 @@ coverage/
                 console.warn('⚠ Remote already exists or could not be added. Skipping.');
             }
         } else {
-            // Try to get project name from package.json
             let defaultName = 'my-project';
             if (fs.existsSync('package.json')) {
                 const pkg = JSON.parse(fs.readFileSync('package.json', 'utf-8'));
@@ -110,7 +136,7 @@ coverage/
                 { type: 'input', name: 'repoName', message: 'Enter repository name:', default: defaultName }
             ]);
 
-            const sanitizedName = repoName; // remove @ if user typed
+            const sanitizedName = repoName;
             console.log(`🔹 Creating remote repository "${sanitizedName}"...`);
 
             try {
@@ -160,15 +186,15 @@ coverage/
     }
 }
 
-
 async function menu() {
     const { action } = await inquirer.prompt([
-        { type: 'list', name: 'action', message: 'Choose an action:', choices: ['list', 'new', 'up', 'exit'] }
+        { type: 'list', name: 'action', message: 'Choose an action:', choices: ['list', 'new', 'up', 'pr', 'exit'] }
     ]);
 
     if (action === 'list') await listBranches();
     else if (action === 'new') await createBranch();
     else if (action === 'up') await up();
+    else if (action === 'pr') await createPR();
     else process.exit(0);
 }
 
@@ -179,6 +205,7 @@ async function menu() {
         case 'list': await listBranches(); break;
         case 'new': await createBranch(); break;
         case 'up': await up(); break;
+        case 'pr': await createPR(); break;
         default: await menu(); break;
     }
 })();
