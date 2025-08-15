@@ -11,10 +11,10 @@ A simple Git CLI extension to manage branches and initialize repositories intera
 ## Installation
 
 You can install the CLI globally via npm:
-npm install -g git-sb
+npm install -g @opablodev/git
 
 Or run it temporarily using npx:
-npx git-sb
+npx @git
 
 ## Usage
 
@@ -42,7 +42,7 @@ The `up` command will:
 
 - Node.js 14+
 - Git
-- (Optional) GitHub CLI `gh` if you want the CLI to create remote repositories automatically.
+- GitHub CLI `gh` if you want the CLI to create remote repositories automatically.
 
 ## License
 
