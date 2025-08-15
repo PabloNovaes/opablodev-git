@@ -1,6 +1,6 @@
 # @Git CLI
 
-A simple interactive Git CLI to manage branches and initialize repositories.
+A simple Git CLI extension to manage branches and initialize repositories interactively.
 
 ## Features
 
