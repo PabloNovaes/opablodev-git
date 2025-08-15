@@ -57,14 +57,44 @@ async function createPR() {
         { type: 'input', name: 'body', message: 'Enter PR description:' }
     ]);
 
-    // Cria o PR
+    // Cria o PR com o usuário corrente como assignee
+    let prNumber;
     try {
-        execSync(`gh pr create --base "${baseBranch}" --head "${currentBranch}" --title "${title}" --body "${body}"`, { stdio: 'inherit' });
-        console.log(`✅ Pull request created from "${currentBranch}" to "${baseBranch}"`);
+        const output = execSync(`gh pr create --base "${baseBranch}" --head "${currentBranch}" --title "${title}" --body "${body}" --assignee @me`, { encoding: 'utf-8' });
+        console.log(output);
+        const match = output.match(/#(\d+)/); // captura número do PR
+        prNumber = match ? match[1] : null;
+        console.log(`✅ Pull request #${prNumber} created from "${currentBranch}" to "${baseBranch}"`);
     } catch (err) {
         console.error('⚠ Failed to create PR. Make sure gh CLI is installed and authenticated.');
+        return;
+    }
+
+    // ------------------ Seleção de reviewers ------------------
+    if (prNumber) {
+        let reviewers = [];
+        try {
+            const raw = execSync('gh api repos/:owner/:repo/collaborators --jq ".[].login"', { encoding: 'utf-8' });
+            reviewers = raw.split('\n').filter(Boolean).filter(u => u !== process.env.GITHUB_USER); // remove você mesmo
+        } catch {
+            console.warn('⚠ Could not fetch reviewers automatically.');
+        }
+
+        if (reviewers.length > 0) {
+            const { selectedReviewers } = await inquirer.prompt([
+                { type: 'checkbox', name: 'selectedReviewers', message: 'Select reviewers for this PR:', choices: reviewers }
+            ]);
+
+            if (selectedReviewers.length > 0) {
+                execSync(`gh pr edit ${prNumber} --add-reviewer ${selectedReviewers.join(',')}`, { stdio: 'inherit' });
+                console.log(`✅ Reviewers added: ${selectedReviewers.join(', ')}`);
+            } else {
+                console.log('⚠ No reviewers selected.');
+            }
+        }
     }
 }
+
 
 async function up() {
     const repoInitialized = validateRepo();
