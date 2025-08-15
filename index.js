@@ -171,7 +171,9 @@ coverage/
     if (remoteConfigured) {
         console.log('🔹 Pushing to remote...');
         try {
-            execSync('git push -u origin main', { stdio: 'inherit' });
+            const currentBranch = execSync('git branch --show-current', { encoding: 'utf-8' }).trim();
+
+            execSync(`git push origin ${currentBranch}`, { stdio: 'inherit' });
             console.log('✅ Push completed!');
         } catch {
             try {
