@@ -1,7 +1,9 @@
 #!/usr/bin/env node
-const { execSync } = require('child_process');
-const inquirer = require('inquirer');
-const fs = require('fs');
+import chalk from 'chalk';
+import { execSync } from 'child_process';
+import fs from 'fs';
+import inquirer from 'inquirer';
+
 
 function validateRepo() {
     try {
@@ -27,6 +29,15 @@ async function listBranches() {
 
     execSync(`git checkout "${branch}"`, { stdio: 'inherit' });
     console.log(`✅ Checked out to branch: ${branch}`);
+}
+
+function currentBranch() {
+    try {
+        const branch = execSync("git branch --show-current", { encoding: "utf-8" }).trim();
+        console.log(`${chalk.green(">")} ${chalk.green(branch)}`);
+    } catch (err) {
+        console.log(chalk.red("❌ Could not detect the current branch."));
+    }
 }
 
 async function createBranch() {
@@ -86,7 +97,6 @@ async function createPR() {
         }
     }
 }
-
 
 async function up() {
     const repoInitialized = validateRepo();
@@ -205,7 +215,12 @@ coverage/
 
 async function menu() {
     const { action } = await inquirer.prompt([
-        { type: 'list', name: 'action', message: 'Choose an action:', choices: ['list', 'new', 'up', 'pr', 'exit'] }
+        {
+            type: 'list',
+            name: 'action',
+            message: 'Choose an action:',
+            choices: ['list', 'new', 'up', 'pr', 'current', 'exit']
+        }
     ]);
 
     if (action === 'list') await listBranches();
@@ -215,14 +230,21 @@ async function menu() {
     else process.exit(0);
 }
 
-(async () => {
-    const subcommand = process.argv[2];
+async function Init() {
+    try {
+        const subcommand = process.argv[2];
 
-    switch (subcommand) {
-        case 'list': await listBranches(); break;
-        case 'new': await createBranch(); break;
-        case 'up': await up(); break;
-        case 'pr': await createPR(); break;
-        default: await menu(); break;
+        switch (subcommand) {
+            case 'list': await listBranches(); break;
+            case 'new': await createBranch(); break;
+            case 'up': await up(); break;
+            case 'pr': await createPR(); break;
+            case 'current': await currentBranch(); break;
+            default: await menu(); break;
+        }
+    } catch (err) {
+        console.error(err)
     }
-})();
+}
+
+Init()
