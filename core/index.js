@@ -54,11 +54,10 @@ export async function createPR() {
     try {
         currentBranch = execSync("git branch --show-current", { encoding: "utf-8" }).trim();
     } catch {
-        console.log(chalk.red("❌ Não foi possível detectar a branch atual."));
+        console.log(chalk.red("❌ Could not detect the current branch."));
         return;
     }
 
-    // Pega branches remotas, remove o prefixo 'origin/'
     let branches = [];
     try {
         branches = execSync('git branch -r --format="%(refname:short)"', { encoding: "utf-8" })
@@ -67,11 +66,11 @@ export async function createPR() {
             .filter(Boolean)
             .filter(b => b !== currentBranch);
     } catch {
-        console.warn(chalk.yellow("⚠ Não foi possível listar branches remotas."));
+        console.warn(chalk.yellow("⚠ Could not list remote branches."));
     }
 
     if (branches.length === 0) {
-        console.log(chalk.red("❌ Nenhuma branch disponível para criar o PR."));
+        console.log(chalk.red("❌ No branches available to create the PR."));
         return;
     }
 
@@ -81,46 +80,55 @@ export async function createPR() {
 
     const { title, body } = await inquirer.prompt([
         { type: "input", name: "title", message: "Enter PR title:" },
-        { type: "input", name: "body", message: "Enter PR description:" }
+        { type: "input", name: "body", message: "Enter PR description (optional):", default: "" }
     ]);
 
-    let prNumber;
-    try {
-        const output = execSync(
-            `gh pr create --base "${baseBranch}" --head "${currentBranch}" --title "${title}" --body "${body}" --assignee @me`,
-            { encoding: "utf-8" }
-        );
-
-        const match = output.match(/#(\d+)/);
-        prNumber = match ? match[1] : null;
-
-        console.log(chalk.green(`✅ Pull request ${prNumber ? `#${prNumber}` : ""} created from "${currentBranch}" to "${baseBranch}"`));
-    } catch {
-        console.error(chalk.red("⚠ Failed to create PR. Make sure gh CLI is installed and authenticated."));
-        return;
-    }
-
-    // Tentar buscar reviewers
+    let selectedReviewers = [];
     try {
         const raw = execSync('gh api repos/:owner/:repo/collaborators --jq ".[].login"', { encoding: "utf-8" });
         const reviewers = raw.split("\n").filter(Boolean);
 
         if (reviewers.length > 0) {
-            const { selectedReviewers } = await inquirer.prompt([
-                { type: "checkbox", name: "selectedReviewers", message: "Select reviewers for this PR:", choices: reviewers }
+            const { chosen } = await inquirer.prompt([
+                { type: "checkbox", name: "chosen", message: "Select reviewers for this PR:", choices: reviewers }
             ]);
-
-            if (selectedReviewers.length > 0) {
-                execSync(`gh pr edit ${prNumber} --add-reviewer ${selectedReviewers.join(",")}`, { stdio: "inherit" });
-                console.log(chalk.green(`✅ Reviewers added: ${selectedReviewers.join(", ")}`));
-            } else {
-                console.log(chalk.yellow("⚠ No reviewers selected."));
-            }
+            selectedReviewers = chosen;
         }
     } catch {
         console.warn(chalk.yellow("⚠ Could not fetch reviewers automatically."));
     }
+
+    let prNumber;
+    try {
+        const cmd = [
+            `gh pr create`,
+            `--base "${baseBranch}"`,
+            `--head "${currentBranch}"`,
+            `--title "${title}"`,
+            `--body "${body}"`, // always include body, even if empty
+            `--assignee @me`,
+            selectedReviewers.length > 0 ? `--reviewer ${selectedReviewers.join(",")}` : ""
+        ]
+            .filter(arg => arg !== "") // only strip empty args, not falsy values
+            .join(" ");
+
+        const output = execSync(cmd, { encoding: "utf-8" });
+        const match = output.match(/#(\d+)/);
+        prNumber = match ? match[1] : null;
+
+        console.log(
+            chalk.green(
+                `✅ Pull request ${prNumber ? `#${prNumber}` : ""} created from "${currentBranch}" to "${baseBranch}"` +
+                (selectedReviewers.length > 0 ? ` with reviewers: ${selectedReviewers.join(", ")}` : "")
+            )
+        );
+    } catch {
+        console.error(chalk.red("⚠ Failed to create PR. Make sure gh CLI is installed and authenticated."));
+        return;
+    }
 }
+
+
 
 async function up() {
     const repoInitialized = validateRepo();
