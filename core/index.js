@@ -49,52 +49,76 @@ async function createBranch() {
     console.log(`✅ Branch "${newBranch}" created and checked out`);
 }
 
-async function createPR() {
-    const currentBranch = execSync('git branch --show-current', { encoding: 'utf-8' }).trim();
+export async function createPR() {
+    let currentBranch;
+    try {
+        currentBranch = execSync("git branch --show-current", { encoding: "utf-8" }).trim();
+    } catch {
+        console.log(chalk.red("❌ Não foi possível detectar a branch atual."));
+        return;
+    }
 
-    const branches = execSync('git branch --format="%(refname:short)"', { encoding: 'utf-8' })
-        .split('\n').map(b => b.trim()).filter(Boolean);
+    // Pega branches remotas, remove o prefixo 'origin/'
+    let branches = [];
+    try {
+        branches = execSync('git branch -r --format="%(refname:short)"', { encoding: "utf-8" })
+            .split("\n")
+            .map(b => b.replace(/^origin\//, "").trim())
+            .filter(Boolean)
+            .filter(b => b !== currentBranch);
+    } catch {
+        console.warn(chalk.yellow("⚠ Não foi possível listar branches remotas."));
+    }
+
+    if (branches.length === 0) {
+        console.log(chalk.red("❌ Nenhuma branch disponível para criar o PR."));
+        return;
+    }
 
     const { baseBranch } = await inquirer.prompt([
-        { type: 'list', name: 'baseBranch', message: 'Select the base branch for the PR:', choices: branches.filter(b => b !== currentBranch) }
+        { type: "list", name: "baseBranch", message: "Select the base branch for the PR:", choices: branches }
     ]);
 
     const { title, body } = await inquirer.prompt([
-        { type: 'input', name: 'title', message: 'Enter PR title:' },
-        { type: 'input', name: 'body', message: 'Enter PR description:' }
+        { type: "input", name: "title", message: "Enter PR title:" },
+        { type: "input", name: "body", message: "Enter PR description:" }
     ]);
 
     let prNumber;
     try {
-        const output = execSync(`gh pr create --base "${baseBranch}" --head "${currentBranch}" --title "${title}" --body "${body}" --assignee @me`, { encoding: 'utf-8' });
-        console.log(output);
+        const output = execSync(
+            `gh pr create --base "${baseBranch}" --head "${currentBranch}" --title "${title}" --body "${body}" --assignee @me`,
+            { encoding: "utf-8" }
+        );
+
+        const match = output.match(/#(\d+)/);
         prNumber = match ? match[1] : null;
-        console.log(`✅ Pull request #${prNumber} created from "${currentBranch}" to "${baseBranch}"`);
-    } catch (err) {
-        console.error('⚠ Failed to create PR. Make sure gh CLI is installed and authenticated.');
+
+        console.log(chalk.green(`✅ Pull request ${prNumber ? `#${prNumber}` : ""} created from "${currentBranch}" to "${baseBranch}"`));
+    } catch {
+        console.error(chalk.red("⚠ Failed to create PR. Make sure gh CLI is installed and authenticated."));
         return;
     }
 
-    if (prNumber) {
-        let reviewers = [];
-        try {
-            const raw = execSync('gh api repos/:owner/:repo/collaborators --jq ".[].login"', { encoding: 'utf-8' });
-        } catch {
-            console.warn('⚠ Could not fetch reviewers automatically.');
-        }
+    // Tentar buscar reviewers
+    try {
+        const raw = execSync('gh api repos/:owner/:repo/collaborators --jq ".[].login"', { encoding: "utf-8" });
+        const reviewers = raw.split("\n").filter(Boolean);
 
         if (reviewers.length > 0) {
             const { selectedReviewers } = await inquirer.prompt([
-                { type: 'checkbox', name: 'selectedReviewers', message: 'Select reviewers for this PR:', choices: reviewers }
+                { type: "checkbox", name: "selectedReviewers", message: "Select reviewers for this PR:", choices: reviewers }
             ]);
 
             if (selectedReviewers.length > 0) {
-                execSync(`gh pr edit ${prNumber} --add-reviewer ${selectedReviewers.join(',')}`, { stdio: 'inherit' });
-                console.log(`✅ Reviewers added: ${selectedReviewers.join(', ')}`);
+                execSync(`gh pr edit ${prNumber} --add-reviewer ${selectedReviewers.join(",")}`, { stdio: "inherit" });
+                console.log(chalk.green(`✅ Reviewers added: ${selectedReviewers.join(", ")}`));
             } else {
-                console.log('⚠ No reviewers selected.');
+                console.log(chalk.yellow("⚠ No reviewers selected."));
             }
         }
+    } catch {
+        console.warn(chalk.yellow("⚠ Could not fetch reviewers automatically."));
     }
 }
 
@@ -109,13 +133,13 @@ async function up() {
 
         if (!fs.existsSync('.gitignore')) {
             const defaultGitignore = `
-node_modules/
-dist/
-.env
-.DS_Store
-*.log
-coverage/
-`;
+                node_modules/
+                dist/
+                .env
+                .DS_Store
+                *.log
+                coverage/
+                `;
             fs.writeFileSync('.gitignore', defaultGitignore.trim());
             console.log('✅ .gitignore created');
         }
@@ -220,15 +244,23 @@ async function menu() {
             name: 'action',
             message: 'Choose an action:',
             choices: ['list', 'new', 'up', 'pr', 'current', 'exit']
+                .map(item => item.charAt(0).toUpperCase() + item.slice(1))
         }
     ]);
 
-    if (action === 'list') await listBranches();
-    else if (action === 'new') await createBranch();
-    else if (action === 'up') await up();
-    else if (action === 'pr') await createPR();
-    else process.exit(0);
+    switch (action.toLowerCase()) {
+        case 'list': return await listBranches();
+        case 'new': return await createBranch();
+        case 'up': return await up();
+        case 'pr': return await createPR();
+        case 'current': return currentBranch();
+        case 'exit':
+            process.exit(0);
+        default:
+            console.log('Invalid option');
+    }
 }
+
 
 async function Init() {
     try {
@@ -239,7 +271,7 @@ async function Init() {
             case 'new': await createBranch(); break;
             case 'up': await up(); break;
             case 'pr': await createPR(); break;
-            case 'current': await currentBranch(); break;
+            case 'current': currentBranch(); break;
             default: await menu(); break;
         }
     } catch (err) {
