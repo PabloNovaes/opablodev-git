@@ -252,7 +252,7 @@ async function menu() {
             name: 'action',
             message: 'Choose an action:',
             choices: ['list', 'new', 'up', 'pr', 'current', 'exit']
-                .map(item => item.charAt(0).toUpperCase() + item.slice(1))
+            // .map(item => item.charAt(0).toUpperCase() + item.slice(1))
         }
     ]);
 
