@@ -230,12 +230,12 @@ async function up() {
         try {
             const currentBranch = execSync('git branch --show-current', { encoding: 'utf-8' }).trim();
 
-            execSync(`git push origin ${currentBranch}`, { stdio: 'inherit' });
+            execSync(`git push -u origin ${currentBranch}`, { stdio: 'inherit' });
             console.log('✅ Push completed!');
         } catch {
             try {
-                execSync('git push -u origin master', { stdio: 'inherit' });
-                console.log('✅ Push completed to master!');
+                execSync('git push -u origin main', { stdio: 'inherit' });
+                console.log('✅ Push completed to main!');
             } catch {
                 console.warn('⚠ Failed to push. Check remote repository and permissions.');
             }
