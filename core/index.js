@@ -79,7 +79,7 @@ export async function createPR() {
     ]);
 
     const { title, body } = await inquirer.prompt([
-        { type: "input", name: "title", message: "Enter PR title:" },
+        { type: "input", name: "title", message: "Enter PR title:", default: currentBranch },
         { type: "input", name: "body", message: "Enter PR description (optional):", default: "" }
     ]);
 
@@ -105,11 +105,11 @@ export async function createPR() {
             `--base "${baseBranch}"`,
             `--head "${currentBranch}"`,
             `--title "${title}"`,
-            `--body "${body}"`, // always include body, even if empty
+            `--body "${body}"`,
             `--assignee @me`,
             selectedReviewers.length > 0 ? `--reviewer ${selectedReviewers.join(",")}` : ""
         ]
-            .filter(arg => arg !== "") // only strip empty args, not falsy values
+            .filter(arg => arg !== "")
             .join(" ");
 
         const output = execSync(cmd, { encoding: "utf-8" });
