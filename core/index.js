@@ -15,7 +15,9 @@ function validateRepo() {
 }
 
 async function listBranches() {
-    const branches = execSync('git branch --format="%(refname:short)"', { encoding: 'utf-8' })
+    const subcommand = process.argv[3];
+
+    const branches = execSync(`git branch ${subcommand === "-all" ? "-r" : ""} --format="%(refname:short)"`, { encoding: 'utf-8' })
         .split('\n').map(b => b.trim()).filter(Boolean);
 
     if (branches.length === 0) {
