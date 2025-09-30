@@ -36,6 +36,8 @@ async function listBranches() {
 function currentBranch() {
     try {
         const branch = execSync("git branch --show-current", { encoding: "utf-8" }).trim();
+        console.log(`${chalk.green(">")} ${chalk.green(branch)}`);
+
         return branch;
     } catch (err) {
         console.log(chalk.red("❌ Could not detect the current branch."));
