@@ -36,19 +36,62 @@ async function listBranches() {
 function currentBranch() {
     try {
         const branch = execSync("git branch --show-current", { encoding: "utf-8" }).trim();
-        console.log(`${chalk.green(">")} ${chalk.green(branch)}`);
+        return branch;
     } catch (err) {
         console.log(chalk.red("❌ Could not detect the current branch."));
+        process.exit(1);
     }
 }
 
 async function createBranch() {
+    let branch = currentBranch();
+
+    if (branch === "main") {
+        console.log(chalk.yellow("You are on main. Pulling latest changes..."));
+        try {
+            execSync("git pull origin main", { stdio: 'inherit' });
+        } catch (err) {
+            console.log(chalk.red("❌ Failed to pull from main."));
+            process.exit(1);
+        }
+    } else {
+        const { switchToMain } = await inquirer.prompt([
+            {
+                type: 'confirm',
+                name: 'switchToMain',
+                message: `You are on branch "${branch}". Do you want to switch to main?`,
+                default: false
+            }
+        ]);
+
+        if (switchToMain) {
+            try {
+                execSync("git checkout main", { stdio: 'inherit' });
+                console.log(chalk.green("✅ Switched to main"));
+                console.log(chalk.yellow("Pulling latest changes from main..."));
+                execSync("git pull origin main", { stdio: 'inherit' });
+            } catch (err) {
+                console.log(chalk.red("❌ Failed to switch to main or pull changes."));
+                process.exit(1);
+            }
+        } else {
+            console.log(chalk.red("❌ Branch creation canceled."));
+            process.exit(0);
+        }
+    }
+
+    // Pergunta o nome da nova branch
     const { newBranch } = await inquirer.prompt([
         { type: 'input', name: 'newBranch', message: 'Enter the name of the new branch:' }
     ]);
 
-    execSync(`git checkout -b "${newBranch}"`, { stdio: 'inherit' });
-    console.log(`✅ Branch "${newBranch}" created and checked out`);
+    try {
+        execSync(`git checkout -b "${newBranch}"`, { stdio: 'inherit' });
+        console.log(chalk.green(`✅ Branch "${newBranch}" created and checked out`));
+    } catch (err) {
+        console.log(chalk.red("❌ Failed to create the new branch."));
+        process.exit(1);
+    }
 }
 
 export async function createPR() {
